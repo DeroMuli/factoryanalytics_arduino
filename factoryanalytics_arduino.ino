@@ -2,11 +2,11 @@
 #include "secret_file.h"
 #include <ESPAsyncTCP.h>
 #include <ESPAsyncWebSrv.h>
-#include <AsyncWebSocket.h>
 #include <ArduinoJson.h>
 
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
+int pinState = LOW;
 
 void setup() {
   // put your setup code here, to run once:
@@ -16,9 +16,12 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
-  digitalWrite(D4,HIGH);
-  delay(1000);
-  digitalWrite(D4,LOW);
+  StaticJsonDocument<200> jsonDoc;
+  jsonDoc["temp"] = 34;
+  jsonDoc["speed"] = 125;
+  String jsonData;
+  serializeJson(jsonDoc, jsonData);
+  ws.textAll(jsonData);
   delay(1000);
 }
 
@@ -49,19 +52,19 @@ if (WiFi.status() == WL_CONNECTED) {
 }
     Serial.println(F("Setup ready"));
       // Start the WebSocket server
-    // ws.onEvent(onWebSocketEvent);
-    // server.addHandler(&ws);
+     ws.onEvent(onWebSocketEvent);
+     server.addHandler(&ws);
       // Start the HTTP server
-    server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+    server.on("/toggle", HTTP_GET, [](AsyncWebServerRequest *request){
+      pinState = !pinState;
+      digitalWrite(D4, pinState); 
       StaticJsonDocument<200> doc;
-      doc["name"] = "John Doe";
-      doc["age"] = 42;
+      doc["state"] = pinState;
       String jsonStr;
       serializeJson(doc, jsonStr);
       request->send(200,"application/json", jsonStr);
     });
     server.begin();
-     //Serial.println("HTTP server started");
 }
 
 void onWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
