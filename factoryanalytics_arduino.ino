@@ -5,16 +5,18 @@
 #include <ArduinoJson.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
+#include <string>
+#include <iostream>
 
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
-int pinState = LOW;
 OneWire oneWire(D5);
 DallasTemperature sensors(&oneWire);
 
 void setup() {
   // put your setup code here, to run once:
   pinMode(D4,OUTPUT);
+  digitalWrite(D4,HIGH);
   connectToWiFi();
   sensors.begin();
 }
@@ -22,9 +24,9 @@ void setup() {
 void loop() {
     // call sensors.requestTemperatures() to issue a global temperature
   // request to all devices on the bus
-  Serial.print("Requesting temperatures...");
+  //Serial.print("Requesting temperatures...");
   sensors.requestTemperatures(); // Send the command to get temperatures
-  Serial.println("DONE");
+  //Serial.println("DONE");
   // After we got the temperatures, we can print them here.
   // We use the function ByIndex, and as an example get the temperature from the first sensor only.
   float tempC = sensors.getTempCByIndex(0);
@@ -36,12 +38,12 @@ void loop() {
   }
   else
   {
-  StaticJsonDocument<200> jsonDoc;
-  jsonDoc["temp"] = tempC;
-  jsonDoc["speed"] = 125;
+  StaticJsonDocument<200> doc;
+  doc["temp"] = tempC;
+  doc["speed"] = 125;
   String jsonData;
-  serializeJson(jsonDoc, jsonData);
-  ws.textAll(jsonData);
+  serializeJson(doc, jsonData);
+ // ws.textAll(jsonData);
   }
   delay(1000);
 }
@@ -59,6 +61,7 @@ void connectToWiFi() {
    WiFi.begin(getWifiSsid(), getWifiPassword());
    int retries = 0;
 while ((WiFi.status() != WL_CONNECTED) && (retries < 15)) {
+   Serial.println(retries);
    retries++;
    delay(500);
    Serial.print(".");
@@ -76,15 +79,6 @@ if (WiFi.status() == WL_CONNECTED) {
      ws.onEvent(onWebSocketEvent);
      server.addHandler(&ws);
       // Start the HTTP server
-    server.on("/toggle", HTTP_GET, [](AsyncWebServerRequest *request){
-      pinState = !pinState;
-      digitalWrite(D4, pinState); 
-      StaticJsonDocument<200> doc;
-      doc["state"] = pinState;
-      String jsonStr;
-      serializeJson(doc, jsonStr);
-      request->send(200,"application/json", jsonStr);
-    });
     server.begin();
 }
 
@@ -94,11 +88,29 @@ void onWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsE
   } else if(type == WS_EVT_DISCONNECT) {
     Serial.printf("Websocket client #%u disconnected\n", client->id());
   } else if(type == WS_EVT_DATA) {
-    Serial.printf("Websocket client #%u data received: ", client->id());
-    for(size_t i=0; i<len; i++) {
-      Serial.print((char) data[i]);
+    Serial.println("here");
+    const uint8_t size = JSON_OBJECT_SIZE(2);
+    StaticJsonDocument<size> json;
+    DeserializationError err = deserializeJson(json, data);
+    if(err){
+      Serial.print(F("deserializeJson() failed with code "));
+      Serial.println(err.c_str());
+      return;
     }
-    Serial.println();
+    const char *action = json["action"];
+    const char *payload = json["payload"];
+    if (strcmp(action, "get_data") == 0) {
+      Serial.println("get data");
+    }
+    if (strcmp(action, "toggle") == 0) {
+      Serial.println("switch on and off");
+      if (strcmp(payload, "ON") == 0) {
+        digitalWrite(D4,LOW);
+      }
+      else {
+        digitalWrite(D4,HIGH);
+      }
+    }
   }
   else if(type == WS_EVT_ERROR){
     Serial.println("internal error");
