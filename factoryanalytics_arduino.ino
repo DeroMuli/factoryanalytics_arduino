@@ -30,21 +30,19 @@ void loop() {
   float tempC = sensors.getTempCByIndex(0);
 
   // Check if reading was successful
-  if (tempC != DEVICE_DISCONNECTED_C)
-  {
-    Serial.print("Temperature for the device 1 (index 0) is: ");
-    Serial.println(tempC);
-  }
-  else
+  if (tempC == DEVICE_DISCONNECTED_C)
   {
     Serial.println("Error: Could not read temperature data");
   }
+  else
+  {
   StaticJsonDocument<200> jsonDoc;
-  jsonDoc["temp"] = 34;
+  jsonDoc["temp"] = tempC;
   jsonDoc["speed"] = 125;
   String jsonData;
   serializeJson(jsonDoc, jsonData);
   ws.textAll(jsonData);
+  }
   delay(1000);
 }
 
