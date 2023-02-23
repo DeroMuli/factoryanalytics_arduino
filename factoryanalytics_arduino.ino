@@ -7,11 +7,13 @@
 #include <DallasTemperature.h>
 #include <string>
 #include <iostream>
+#include <list>
 
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 OneWire oneWire(D5);
 DallasTemperature sensors(&oneWire);
+std::list<uint32_t> client_ids = {};
 
 void setup() {
   // put your setup code here, to run once:
@@ -43,7 +45,9 @@ void loop() {
   doc["speed"] = 125;
   String jsonData;
   serializeJson(doc, jsonData);
- // ws.textAll(jsonData);
+  for (auto itr = client_ids.begin(); itr != client_ids.end(); itr++) {
+    ws.text(*itr,jsonData);
+   }  
   }
   delay(1000);
 }
@@ -58,17 +62,18 @@ void connectToWiFi() {
    Serial.println();
    Serial.print("Connecting to WiFi");
    Serial.println("...");
-   WiFi.begin(getWifiSsid(), getWifiPassword());
+   WiFi.mode(WIFI_STA);
+   WiFi.begin(getWifiSsid(),getWifiPassword());
    int retries = 0;
-while ((WiFi.status() != WL_CONNECTED) && (retries < 15)) {
-   Serial.println(retries);
-   retries++;
-   delay(500);
-   Serial.print(".");
-}
-if (retries > 14) {
+   while ((WiFi.status() != WL_CONNECTED) && (retries < 15)) {
+     Serial.println(retries);
+     retries++;
+     delay(1000);
+     Serial.print(".");
+    }
+  if (retries > 14) {
     Serial.println(F("WiFi connection FAILED"));
-}
+  }
 if (WiFi.status() == WL_CONNECTED) {
     Serial.println(F("WiFi connected!"));
     Serial.println("IP address: ");
@@ -76,8 +81,8 @@ if (WiFi.status() == WL_CONNECTED) {
 }
     Serial.println(F("Setup ready"));
       // Start the WebSocket server
-     ws.onEvent(onWebSocketEvent);
-     server.addHandler(&ws);
+    ws.onEvent(onWebSocketEvent);
+    server.addHandler(&ws);
       // Start the HTTP server
     server.begin();
 }
@@ -87,6 +92,7 @@ void onWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsE
     Serial.printf("Websocket client #%u connected\n", client->id());
   } else if(type == WS_EVT_DISCONNECT) {
     Serial.printf("Websocket client #%u disconnected\n", client->id());
+    client_ids.remove(client->id());
   } else if(type == WS_EVT_DATA) {
     Serial.println("here");
     const uint8_t size = JSON_OBJECT_SIZE(2);
@@ -101,6 +107,7 @@ void onWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsE
     const char *payload = json["payload"];
     if (strcmp(action, "get_data") == 0) {
       Serial.println("get data");
+      client_ids.push_front(client->id());
     }
     if (strcmp(action, "toggle") == 0) {
       Serial.println("switch on and off");
