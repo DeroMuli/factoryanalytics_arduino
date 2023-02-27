@@ -18,12 +18,21 @@ std::list<uint32_t> client_ids = {};
 void setup() {
   // put your setup code here, to run once:
   pinMode(D4,OUTPUT);
+  pinMode(D3,OUTPUT);
+  pinMode(D7,OUTPUT);
+  pinMode(D8,OUTPUT);
+  digitalWrite(D7,HIGH);
+  digitalWrite(D8,LOW);
   digitalWrite(D4,HIGH);
   connectToWiFi();
   sensors.begin();
 }
 
 void loop() {
+  for (int i = 50; i <= 100; i++) {
+    analogWrite(D3, i); // Set PWM value for motor A
+    delay(10); // Wait for 10 milliseconds
+  }
     // call sensors.requestTemperatures() to issue a global temperature
   // request to all devices on the bus
   //Serial.print("Requesting temperatures...");
