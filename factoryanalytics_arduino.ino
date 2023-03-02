@@ -8,56 +8,53 @@
 #include <string>
 #include <iostream>
 #include <list>
+#include <L298N.h>
 
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 OneWire oneWire(D5);
 DallasTemperature sensors(&oneWire);
 std::list<uint32_t> client_ids = {};
+L298N motor(D3, D7, D8);
+bool is_motor_on = false;
 
 void setup() {
   // put your setup code here, to run once:
   pinMode(D4,OUTPUT);
-  pinMode(D3,OUTPUT);
-  pinMode(D7,OUTPUT);
-  pinMode(D8,OUTPUT);
-  digitalWrite(D7,HIGH);
-  digitalWrite(D8,LOW);
   digitalWrite(D4,HIGH);
+  motor.setSpeed(motor.getSpeed());
   connectToWiFi();
-  sensors.begin();
+  //sensors.begin();
 }
 
 void loop() {
-  for (int i = 50; i <= 100; i++) {
-    analogWrite(D3, i); // Set PWM value for motor A
-    delay(10); // Wait for 10 milliseconds
-  }
+  
+  motor.forward();
     // call sensors.requestTemperatures() to issue a global temperature
   // request to all devices on the bus
   //Serial.print("Requesting temperatures...");
-  sensors.requestTemperatures(); // Send the command to get temperatures
+  //sensors.requestTemperatures(); // Send the command to get temperatures
   //Serial.println("DONE");
   // After we got the temperatures, we can print them here.
   // We use the function ByIndex, and as an example get the temperature from the first sensor only.
-  float tempC = sensors.getTempCByIndex(0);
+  //float tempC = sensors.getTempCByIndex(0);
 
   // Check if reading was successful
-  if (tempC == DEVICE_DISCONNECTED_C)
-  {
-    Serial.println("Error: Could not read temperature data");
-  }
-  else
-  {
+  //if (tempC == DEVICE_DISCONNECTED_C)
+  //{
+  //  Serial.println("Error: Could not read temperature data");
+ // }
+  //else
+ // {
   StaticJsonDocument<200> doc;
-  doc["temp"] = tempC;
-  doc["speed"] = 125;
+  doc["temp"] = 20;
+  doc["speed"] = motor.getSpeed();
   String jsonData;
   serializeJson(doc, jsonData);
   for (auto itr = client_ids.begin(); itr != client_ids.end(); itr++) {
     ws.text(*itr,jsonData);
    }  
-  }
+ // }
   delay(1000);
 }
 
@@ -71,7 +68,7 @@ void connectToWiFi() {
    Serial.println();
    Serial.print("Connecting to WiFi");
    Serial.println("...");
-   WiFi.mode(WIFI_STA);
+  //WiFi.mode(WIFI_STA);
    WiFi.begin(getWifiSsid(),getWifiPassword());
    int retries = 0;
    while ((WiFi.status() != WL_CONNECTED) && (retries < 15)) {
@@ -125,7 +122,15 @@ void onWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsE
       }
       else {
         digitalWrite(D4,HIGH);
+        motor.setSpeed(0);
       }
+    }
+    if (strcmp(action, "set_speed") == 0) {
+      Serial.println("setting the speed");
+      char temp_speed_array[10];
+      strncpy(temp_speed_array,payload,sizeof(temp_speed_array));
+      unsigned short speed = (unsigned short) strtoul(temp_speed_array, NULL, 10);
+      motor.setSpeed(speed);
     }
   }
   else if(type == WS_EVT_ERROR){
