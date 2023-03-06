@@ -16,45 +16,56 @@ OneWire oneWire(D5);
 DallasTemperature sensors(&oneWire);
 std::list<uint32_t> client_ids = {};
 L298N motor(D3, D7, D8);
-bool is_motor_on = false;
+int ir_sensor_pin = D6;
+int old_time = 0;
+int c_time;
+float rev = 0;
+int rpm;
+
+void IRAM_ATTR isr() //interrupt service routine
+{
+rev++;
+}
 
 void setup() {
   // put your setup code here, to run once:
   pinMode(D4,OUTPUT);
   digitalWrite(D4,HIGH);
+  pinMode(D6, INPUT_PULLUP);
+  attachInterrupt(D6, isr,RISING);
   motor.setSpeed(motor.getSpeed());
   connectToWiFi();
-  //sensors.begin();
+  sensors.begin();
 }
 
 void loop() {
   
+  Serial.println(rev);
   motor.forward();
-    // call sensors.requestTemperatures() to issue a global temperature
-  // request to all devices on the bus
-  //Serial.print("Requesting temperatures...");
-  //sensors.requestTemperatures(); // Send the command to get temperatures
-  //Serial.println("DONE");
-  // After we got the temperatures, we can print them here.
-  // We use the function ByIndex, and as an example get the temperature from the first sensor only.
-  //float tempC = sensors.getTempCByIndex(0);
+  c_time=millis()-old_time;
+  rpm=(rev/c_time)*60000*2;
+  old_time=millis();
+  rev=0;
+  sensors.requestTemperaturesByIndex(0);
+  float tempC = sensors.getTempCByIndex(0);
 
   // Check if reading was successful
-  //if (tempC == DEVICE_DISCONNECTED_C)
-  //{
-  //  Serial.println("Error: Could not read temperature data");
- // }
-  //else
- // {
+  if (tempC == DEVICE_DISCONNECTED_C)
+  {
+    Serial.println("Error: Could not read temperature data shit");
+  }
+  else
+  {
+  Serial.println(tempC);
   StaticJsonDocument<200> doc;
-  doc["temp"] = 20;
-  doc["speed"] = motor.getSpeed();
+  doc["temp"] = tempC;
+  doc["speed"] = rpm;
   String jsonData;
   serializeJson(doc, jsonData);
   for (auto itr = client_ids.begin(); itr != client_ids.end(); itr++) {
     ws.text(*itr,jsonData);
    }  
- // }
+  }
   delay(1000);
 }
 
